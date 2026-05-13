@@ -1175,42 +1175,43 @@ def cadastrar_categoria():
 
 @app.route('/pedidos', methods=['GET'])
 def pedidos():
-    """
-        GET /pedidos
-        ---------------------------
-        Retorna a lista de pedidos cadastrados.
-
-         Exemplo de resposta:
-        {
-            "pedidos": [
-                {
-                    "id_pedido": 1,
-                    "numero_da_mesa": 5,
-                    "id_lanche": 2,
-                    "id_bebida": 1,
-                    "detalhamento": "Sem cebola",
-                    "status": "em preparo"
-                }
-            ]
-        }
-        """
     db_session = local_session()
-    try:
-        sql_pedidos = select(Pedido).order_by(Pedido.id_pedido.desc())
 
-        pedido_resultado = db_session.execute(sql_pedidos).scalars()
-        pedidos = []
-        for n in pedido_resultado:
-            pedidos.append(n.serialize())
-            print(pedidos[-1])
+    try:
+        query = (
+            select(Pedido, Venda)
+            .join(Venda, Pedido.id_venda == Venda.id_venda)
+            .order_by(Pedido.id_pedido.desc())
+        )
+
+        resultado = db_session.execute(query).all()
+
+        vendas_map = {}
+
+        for pedido, venda in resultado:
+
+            id_venda = venda.id_venda
+
+            if id_venda not in vendas_map:
+                vendas_map[id_venda] = {
+                    "id_venda": id_venda,
+                    "tipo_venda": venda.tipo_venda,
+                    "mesa": pedido.numero_mesa,
+                    "horario": pedido.data_pedido[11:16],
+                    "pedidos": []
+                }
+
+            vendas_map[id_venda]["pedidos"].append(pedido.serialize())
+
         return jsonify({
-            "pedidos": pedidos
+            "vendas": list(vendas_map.values())
         })
+
     except Exception as e:
         return jsonify({"error": str(e)})
+
     finally:
         db_session.close()
-
 
 @app.route('/vendas/receitas', methods=['GET'])
 # @jwt_required()
